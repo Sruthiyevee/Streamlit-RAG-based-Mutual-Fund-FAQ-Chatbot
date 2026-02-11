@@ -16,10 +16,22 @@ A "facts-only" chatbot that answers questions about HDFC Mutual Funds using a Re
     ```
 
 2.  **Environment Variables**:
+    
+    **For CLI and Backend (`.env` file)**:
     Create a `.env` file in the root directory:
     ```
     GROQ_API_KEY=your_groq_api_key_here
     ```
+
+    **For Streamlit App**:
+    - Copy `phase_6_streamlit_app/.streamlit/secrets.toml.example` to `phase_6_streamlit_app/.streamlit/secrets.toml`
+    - Replace `YOUR_GROQ_API_KEY_HERE` with your actual Groq API key
+    - **Note**: `secrets.toml` is gitignored for security. Never commit API keys!
+
+    **For Streamlit Cloud Deployment**:
+    - Go to your Streamlit Cloud dashboard
+    - Navigate to App Settings → Secrets
+    - Add: `GROQ_API_KEY = "your_actual_key_here"`
 
 3.  **Run the Chatbot**:
     ```bash
