@@ -13,7 +13,10 @@ if project_root not in sys.path:
 # Import backend modules
 try:
     from phase3_retrieval.retrieval_pipeline import RetrievalSystem
+    from phase3_retrieval.query_classifier import QueryClassifier
     from phase4_generation.generation_pipeline import AnswerGenerator
+    from phase4_generation.refusal_handler import RefusalHandler
+    from utils.suggestions import SuggestionsHandler
 except ImportError as e:
     st.error(f"Failed to import backend modules: {e}")
     st.stop()
@@ -171,6 +174,9 @@ def load_rag_system():
         
     try:
         retriever = RetrievalSystem(embeddings_dir)
+        classifier = QueryClassifier()
+        refusal_handler = RefusalHandler()
+        suggestions_handler = SuggestionsHandler()
         
         # API Key Handling: Priority st.secrets > os.getenv
         api_key = None
@@ -195,7 +201,7 @@ def load_rag_system():
             st.stop()
 
         generator = AnswerGenerator(api_key=api_key)
-        return retriever, generator
+        return retriever, classifier, refusal_handler, suggestions_handler, generator
     except Exception as e:
         st.error(f"❌ Failed to initialize RAG system: {type(e).__name__}")
         st.error(f"Details: {str(e)}")
@@ -204,7 +210,7 @@ def load_rag_system():
             st.code(traceback.format_exc())
         st.stop()
 
-retriever, generator = load_rag_system()
+retriever, classifier, refusal_handler, suggestions_handler, generator = load_rag_system()
 
 # Initialize Session State for Chat History
 if "messages" not in st.session_state:
@@ -298,33 +304,41 @@ if prompt:
                 if cleaned_query in conversational_triggers:
                     response_text = "You’re welcome! 🙂 What else would you like to know about mutual funds?"
                 else:
-                    # 2. Retrieval
-                    chunks = retriever.retrieve(prompt, k=5)
+                    # 2. Query Classification
+                    classification = classifier.classify(prompt)
                     
-                    # 3. Generation
-                    response_text = generator.generate_answer(prompt, chunks)
+                    if classification['type'] == 'advisory':
+                        # Advisory question - polite refusal
+                        refusal = refusal_handler.get_refusal(prompt, classification)
+                        response_text = refusal['message']
+                        first_source = refusal['educational_link']
+                        suggestions = refusal['suggestions']
+                    else:
+                        # Factual question - proceed with RAG
+                        # 3. Retrieval
+                        chunks = retriever.retrieve(prompt, k=5)
+                        
+                        # Check if we have good chunks
+                        if not chunks or (chunks and chunks[0].get('score', 0) < 0.5):
+                            # No answer available
+                            response_text = "I don't know based on the provided sources 🙂 Try asking about specific fund details like expense ratio, SIP amount, or lock-in period."
+                            first_source = None  # NO SOURCE
+                            suggestions = suggestions_handler.get_no_answer_suggestions()
+                        else:
+                            # 4. Generation
+                            response_text = generator.generate_answer(prompt, chunks)
                     
-                    # 4. Source Extraction - Get only first relevant source
-                    sources = [
-                        chunk.get('metadata', {}).get('source_url') or 
-                        chunk.get('metadata', {}).get('source_file')
-                        for chunk in chunks
-                    ]
-                    sources = [s for s in sources if s]
-                    
-                    if sources:
-                        first_source = sources[0]  # Get only the first source
-                    
-                    # 5. Suggestions for "I don't know"
-                    if "I don't know based on the provided sources" in response_text:
-                        FALLBACK_QUESTIONS = [
-                            "What is the investment objective of HDFC Large Cap Fund?",
-                            "What are the risks associated with mutual funds?",
-                            "Who is eligible to invest in HDFC Mutual Fund?",
-                            "How is NAV calculated?",
-                            "What is a Systematic Investment Plan (SIP)?"
+                    # 5. Source Extraction (only for factual answers with chunks)
+                    if classification.get('type') == 'factual' and chunks and chunks[0].get('score', 0) >= 0.5:
+                        sources = [
+                            chunk.get('metadata', {}).get('source_url') or 
+                            chunk.get('metadata', {}).get('source_file')
+                            for chunk in chunks
                         ]
-                        suggestions = random.sample(FALLBACK_QUESTIONS, 3)
+                        sources = [s for s in sources if s]
+                        
+                        if sources:
+                            first_source = sources[0]
 
                 # Display response
                 st.markdown(response_text)
