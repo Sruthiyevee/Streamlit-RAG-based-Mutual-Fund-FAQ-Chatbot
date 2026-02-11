@@ -13,7 +13,7 @@ class QueryClassifier:
         # Advisory patterns - trigger refusal
         self.advisory_patterns = [
             r'\b(should i|shall i|can i|would you recommend)\b',
-            r'\b(recommend|suggestion|suggest|advice|advise)\b',
+            r'\b(recommend|suggestion|suggest|advice|advise)\b.*\bfund\b',
             r'\b(best fund|better fund|which fund|what fund should)\b',
             r'\b(buy|sell|invest in|switch to|move to)\b.*\bfund\b',
             r'\b(good time|right time|when to)\b.*\b(invest|buy|sell)\b',
@@ -22,6 +22,11 @@ class QueryClassifier:
             r'\bshould i (buy|sell|invest|switch)\b',
             r'\b(worth investing|good investment)\b',
             r'\b(compare|comparison)\b.*\bfund',
+            r'\b(good for|suitable for|right for)\b.*\b(me|my|long.?term|wealth|retirement)\b',
+            r'\b(highest|maximum|best) (return|profit|gain)',
+            r'\b(will (give|provide|generate))\b.*\b(return|profit)',
+            r'\b(safer|riskier|risky to invest)\b',
+            r'\b(perform better|outperform|beat)\b',
         ]
         
         # Factual keywords - proceed to RAG
@@ -55,13 +60,20 @@ class QueryClassifier:
         """
         query_lower = query.lower().strip()
         
+        # Exclude operational/factual queries that might match advisory patterns
+        operational_keywords = [
+            'download', 'access', 'get', 'find', 'where', 'how to', 'how do i',
+            'how can i', 'steps to', 'guide', 'instructions', 'process'
+        ]
+        is_operational = any(keyword in query_lower for keyword in operational_keywords)
+        
         # Check for advisory patterns
         advisory_matches = []
         for pattern in self.advisory_regex:
             if pattern.search(query_lower):
                 advisory_matches.append(pattern.pattern)
         
-        if advisory_matches:
+        if advisory_matches and not is_operational:
             return {
                 'type': 'advisory',
                 'confidence': 0.9,
