@@ -72,8 +72,10 @@ If information is missing or irrelevant, strictly state: "I don't know based on 
             return chat_completion.choices[0].message.content
             
         except Exception as e:
-            logging.error(f"Error generating answer: {e}")
-            return "Thinking fail. Sorry, I encountered an error while generating the response."
+            error_details = f"Error generating answer: {type(e).__name__}: {str(e)}"
+            logging.error(error_details)
+            # Return detailed error for debugging
+            return f"Sorry, I encountered an error while generating the response. Details: {str(e)}"
 
     def _build_context_str(self, chunks: List[Dict[str, Any]]) -> str:
         """Helper to format context with sources."""

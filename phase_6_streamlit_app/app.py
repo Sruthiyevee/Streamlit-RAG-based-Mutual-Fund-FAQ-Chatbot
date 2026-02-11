@@ -179,11 +179,29 @@ def load_rag_system():
         
         if not api_key:
              api_key = os.getenv("GROQ_API_KEY")
+        
+        if not api_key or api_key == "YOUR_GROQ_API_KEY_HERE":
+            st.error("❌ **GROQ_API_KEY not configured!**")
+            st.info("""
+            **For Streamlit Cloud:**
+            1. Go to your app settings
+            2. Navigate to Secrets
+            3. Add: `GROQ_API_KEY = "your_actual_key"`
+            
+            **For Local Development:**
+            1. Copy `secrets.toml.example` to `secrets.toml`
+            2. Replace the placeholder with your actual API key
+            """)
+            st.stop()
 
         generator = AnswerGenerator(api_key=api_key)
         return retriever, generator
     except Exception as e:
-        st.error(f"Failed to initialize RAG system: {e}")
+        st.error(f"❌ Failed to initialize RAG system: {type(e).__name__}")
+        st.error(f"Details: {str(e)}")
+        with st.expander("🔍 Full Error Trace"):
+            import traceback
+            st.code(traceback.format_exc())
         st.stop()
 
 retriever, generator = load_rag_system()
@@ -330,7 +348,17 @@ if prompt:
                 })
                 
             except Exception as e:
-                error_msg = f"Sorry, I encountered an error: {str(e)}"
+                import traceback
+                error_details = traceback.format_exc()
+                error_msg = f"❌ Error: {type(e).__name__}: {str(e)}"
+                
+                # Log detailed error for debugging
                 st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                with st.expander("🔍 Debug Details (click to expand)"):
+                    st.code(error_details)
+                
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": f"Sorry, I encountered an error. Please check:\n\n1. API key is correctly set in Streamlit Cloud Secrets\n2. All dependencies are installed\n3. Vector database files are present\n\nError: {str(e)}"
+                })
 
