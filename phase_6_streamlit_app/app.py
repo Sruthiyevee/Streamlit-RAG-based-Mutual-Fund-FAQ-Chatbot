@@ -272,7 +272,10 @@ for idx, msg in enumerate(st.session_state.messages):
         if msg["role"] == "assistant" and "source" in msg and msg["source"]:
             source = msg["source"]
             if source.startswith("http"):
-                st.markdown(f'<div class="source-link">📎 Source: <a href="{source}" target="_blank">{source}</a></div>', unsafe_allow_html=True)
+                # Get friendly display name
+                from source_utils import get_source_display_name
+                display_name = get_source_display_name(source)
+                st.markdown(f'<div class="source-link">📎 Source: <a href="{source}" target="_blank">{display_name}</a></div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="source-link">📎 Source: {source}</div>', unsafe_allow_html=True)
 
@@ -365,7 +368,9 @@ if prompt:
                 # Display source below the message (if available)
                 if first_source:
                     if first_source.startswith("http"):
-                        st.markdown(f'<div class="source-link">📎 Source: <a href="{first_source}" target="_blank">{first_source}</a></div>', unsafe_allow_html=True)
+                        from source_utils import get_source_display_name
+                        display_name = get_source_display_name(first_source)
+                        st.markdown(f'<div class="source-link">📎 Source: <a href="{first_source}" target="_blank">{display_name}</a></div>', unsafe_allow_html=True)
                     else:
                         st.markdown(f'<div class="source-link">📎 Source: {first_source}</div>', unsafe_allow_html=True)
                 
