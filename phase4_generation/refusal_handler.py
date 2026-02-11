@@ -11,23 +11,23 @@ class RefusalHandler:
     def __init__(self):
         self.refusal_templates = {
             'investment_advice': {
-                'message': "I can't provide investment advice or recommendations 🙂 Please consult a SEBI-registered investment advisor for personalized guidance.",
+                'message': "I can't help with investment opinions or recommendations.\n\nI can, however, share factual information from official sources.",
                 'educational_link': 'https://www.amfiindia.com/investor-corner/knowledge-center'
             },
             'portfolio_advice': {
-                'message': "I can't help with portfolio decisions 🙂 For personalized advice, please speak with a qualified financial advisor.",
+                'message': "I can't help with portfolio decisions.\n\nI can, however, share factual information from official sources.",
                 'educational_link': 'https://www.amfiindia.com/investor-corner/knowledge-center/basics-of-mutual-funds'
             },
             'comparison': {
-                'message': "I can't compare or recommend funds 🙂 I can only share factual information about individual funds from official sources.",
+                'message': "I can't compare or recommend funds.\n\nI can, however, share factual information about individual funds from official sources.",
                 'educational_link': 'https://www.amfiindia.com/investor-corner/knowledge-center/how-to-invest-in-mutual-funds'
             },
             'timing': {
-                'message': "I can't advise on market timing or when to invest 🙂 Please consult a financial advisor for guidance on investment timing.",
+                'message': "I can't advise on market timing or when to invest.\n\nI can, however, share factual information from official sources.",
                 'educational_link': 'https://www.amfiindia.com/investor-corner/knowledge-center/understanding-risk-and-return'
             },
             'default': {
-                'message': "I can only provide factual information from official sources, not investment advice 🙂 Please consult a SEBI-registered advisor for personalized guidance.",
+                'message': "I can only provide factual information from official sources, not investment advice.\n\nI can, however, help you with specific fund details.",
                 'educational_link': 'https://www.amfiindia.com/investor-corner/knowledge-center'
             }
         }

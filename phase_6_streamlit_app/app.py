@@ -215,8 +215,28 @@ retriever, classifier, refusal_handler, suggestions_handler, generator = load_ra
 # Initialize Session State for Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Hi there! 👋 I'm here to help answer your questions about mutual funds. What would you like to know?"}
+        {
+            "role": "assistant", 
+            "content": "Hi! 👋\n\nI can help you with factual information about mutual funds using official public sources.\n\n**Facts only. No investment advice.**",
+            "show_starters": True
+        }
     ]
+
+# Starter questions (fixed set)
+STARTER_QUESTIONS = [
+    "What is the expense ratio of HDFC Midcap Fund?",
+    "Is there any exit load for HDFC Large Cap Fund?",
+    "What is the minimum SIP investment required for HDFC Flexi Cap Fund?",
+    "What is the risk level and benchmark of HDFC Small Cap Fund?",
+    "How can I download my capital gains statement?",
+]
+
+# Alternate questions after refusal (fixed set)
+ALTERNATE_QUESTIONS = [
+    "What is the expense ratio of HDFC Midcap Fund?",
+    "What exit load applies to HDFC Large Cap Fund?",
+    "How can I download my mutual fund statements?",
+]
 
 if "show_suggestions" not in st.session_state:
     st.session_state.show_suggestions = True
@@ -256,17 +276,16 @@ for idx, msg in enumerate(st.session_state.messages):
             else:
                 st.markdown(f'<div class="source-link">📎 Source: {source}</div>', unsafe_allow_html=True)
 
-# Show suggested questions after the first message
+# Show starter questions after the first message
 if st.session_state.show_suggestions and len(st.session_state.messages) == 1:
     st.markdown("<div class='suggested-questions'>", unsafe_allow_html=True)
-    cols = st.columns(2)
-    for idx, question in enumerate(SUGGESTED_QUESTIONS):
-        with cols[idx % 2]:
-            if st.button(question, key=f"suggest_{idx}", use_container_width=True):
-                # Trigger the question
-                st.session_state.show_suggestions = False
-                st.session_state.triggered_question = question
-                st.rerun()
+    st.markdown("**Try asking:**")
+    for idx, question in enumerate(STARTER_QUESTIONS):
+        if st.button(question, key=f"starter_{idx}", use_container_width=True):
+            # Trigger the question
+            st.session_state.show_suggestions = False
+            st.session_state.triggered_question = question
+            st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # Handle triggered question from suggestions
