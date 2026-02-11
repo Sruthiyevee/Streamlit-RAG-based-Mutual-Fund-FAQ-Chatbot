@@ -1,0 +1,336 @@
+import streamlit as st
+import os
+import sys
+import random
+
+# Add project root to path for imports
+# This assumes the app is run from the project root or phase_6_streamlit_app folder within the project
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+# Import backend modules
+try:
+    from phase3_retrieval.retrieval_pipeline import RetrievalSystem
+    from phase4_generation.generation_pipeline import AnswerGenerator
+except ImportError as e:
+    st.error(f"Failed to import backend modules: {e}")
+    st.stop()
+
+# Page Config
+st.set_page_config(
+    page_title="MF Facts",
+    page_icon="ℹ️",
+    layout="centered"
+)
+
+# --- CSS Styling (Dark Theme matching screenshot) ---
+st.markdown("""
+<style>
+    /* Dark background */
+    .stApp {
+        background-color: #1a1a1a;
+    }
+    
+    /* Custom header */
+    .custom-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 20px;
+    }
+    
+    .header-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #00d4aa 0%, #00a896 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: #1a1a1a;
+        font-weight: bold;
+    }
+    
+    .header-text h1 {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 600;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .header-text p {
+        color: #999;
+        font-size: 14px;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Chat messages */
+    .stChatMessage {
+        background-color: transparent !important;
+        padding: 8px 0 !important;
+    }
+    
+    /* Assistant messages - left aligned, dark gray */
+    [data-testid="stChatMessageContent"] {
+        background-color: #2d2d2d;
+        border-radius: 16px;
+        padding: 14px 18px;
+        color: #e0e0e0;
+        max-width: 85%;
+    }
+    
+    /* User messages - right aligned, teal */
+    .stChatMessage[data-testid="user"] [data-testid="stChatMessageContent"] {
+        background: linear-gradient(135deg, #00d4aa 0%, #00a896 100%);
+        color: #000000;
+        margin-left: auto;
+    }
+    
+    /* Chat input */
+    .stChatInput {
+        background-color: #2d2d2d;
+        border-radius: 24px;
+    }
+    
+    .stChatInput input {
+        background-color: #2d2d2d !important;
+        color: #ffffff !important;
+        border: 1px solid #444 !important;
+        border-radius: 24px !important;
+    }
+    
+    /* Remove default Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* Suggested questions styling */
+    .suggested-questions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    /* Source link styling */
+    .source-link {
+        font-size: 12px;
+        color: #00d4aa;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #444;
+    }
+    
+    .source-link a {
+        color: #00d4aa;
+        text-decoration: none;
+    }
+    
+    .source-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Initialization ---
+
+@st.cache_resource
+def load_rag_system():
+    """Initialize Retriever and Generator only once."""
+    base_dir = project_root
+    embeddings_dir = os.path.join(base_dir, "phase2_vector_db")
+    
+    if not os.path.exists(embeddings_dir):
+        st.error(f"Embeddings directory not found at {embeddings_dir}. Please run Phase 2 first.")
+        st.stop()
+        
+    try:
+        retriever = RetrievalSystem(embeddings_dir)
+        
+        # API Key Handling: Priority st.secrets > os.getenv
+        api_key = None
+        if "GROQ_API_KEY" in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
+        
+        if not api_key:
+             api_key = os.getenv("GROQ_API_KEY")
+
+        generator = AnswerGenerator(api_key=api_key)
+        return retriever, generator
+    except Exception as e:
+        st.error(f"Failed to initialize RAG system: {e}")
+        st.stop()
+
+retriever, generator = load_rag_system()
+
+# Initialize Session State for Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hi there! 👋 I'm here to help answer your questions about mutual funds. What would you like to know?"}
+    ]
+
+if "show_suggestions" not in st.session_state:
+    st.session_state.show_suggestions = True
+
+# Suggested questions - verified to have answers in knowledge base
+SUGGESTED_QUESTIONS = [
+    "What is a Systematic Investment Plan (SIP)?",
+    "What are the risks associated with mutual funds?",
+    "How is NAV calculated?",
+    "What are the different types of mutual funds?",
+    "How can I redeem my mutual fund units?"
+]
+
+# --- UI Layout ---
+
+# Custom Header
+st.markdown("""
+<div class="custom-header">
+    <div class="header-icon">ℹ️</div>
+    <div class="header-text">
+        <h1>MF Facts</h1>
+        <p>Verified mutual fund facts. No advice.</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Display Chat History
+for idx, msg in enumerate(st.session_state.messages):
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        
+        # Display source if available (only for assistant messages)
+        if msg["role"] == "assistant" and "source" in msg and msg["source"]:
+            source = msg["source"]
+            if source.startswith("http"):
+                st.markdown(f'<div class="source-link">📎 Source: <a href="{source}" target="_blank">{source}</a></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="source-link">📎 Source: {source}</div>', unsafe_allow_html=True)
+
+# Show suggested questions after the first message
+if st.session_state.show_suggestions and len(st.session_state.messages) == 1:
+    st.markdown("<div class='suggested-questions'>", unsafe_allow_html=True)
+    cols = st.columns(2)
+    for idx, question in enumerate(SUGGESTED_QUESTIONS):
+        with cols[idx % 2]:
+            if st.button(question, key=f"suggest_{idx}", use_container_width=True):
+                # Trigger the question
+                st.session_state.show_suggestions = False
+                st.session_state.triggered_question = question
+                st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Handle triggered question from suggestions
+if "triggered_question" in st.session_state:
+    prompt = st.session_state.triggered_question
+    del st.session_state.triggered_question
+    # Process the triggered question immediately
+else:
+    prompt = None
+
+# Always show chat input
+user_input = st.chat_input("Ask a question about mutual funds...")
+if user_input:
+    prompt = user_input
+
+# Handle User Input
+if prompt:
+    # Add user message to history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generate Response
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing documents..."):
+            try:
+                # 1. Check for conversational triggers
+                conversational_triggers = {"ok", "okay", "thanks", "thank you", "got it", "thx", "cheers", "cool", "👍", "yes", "hi", "hello"}
+                cleaned_query = "".join(char for char in prompt.lower() if char.isalnum() or char.isspace()).strip()
+                
+                response_text = ""
+                first_source = None
+                suggestions = []
+
+                if cleaned_query in conversational_triggers:
+                    response_text = "You’re welcome! 🙂 What else would you like to know about mutual funds?"
+                else:
+                    # 2. Retrieval
+                    chunks = retriever.retrieve(prompt, k=5)
+                    
+                    # 3. Generation
+                    response_text = generator.generate_answer(prompt, chunks)
+                    
+                    # 4. Source Extraction - Get only first relevant source
+                    sources = [
+                        chunk.get('metadata', {}).get('source_url') or 
+                        chunk.get('metadata', {}).get('source_file')
+                        for chunk in chunks
+                    ]
+                    sources = [s for s in sources if s]
+                    
+                    if sources:
+                        first_source = sources[0]  # Get only the first source
+                    
+                    # 5. Suggestions for "I don't know"
+                    if "I don't know based on the provided sources" in response_text:
+                        FALLBACK_QUESTIONS = [
+                            "What is the investment objective of HDFC Large Cap Fund?",
+                            "What are the risks associated with mutual funds?",
+                            "Who is eligible to invest in HDFC Mutual Fund?",
+                            "How is NAV calculated?",
+                            "What is a Systematic Investment Plan (SIP)?"
+                        ]
+                        suggestions = random.sample(FALLBACK_QUESTIONS, 3)
+
+                # Display response
+                st.markdown(response_text)
+                
+                # Display source below the message (if available)
+                if first_source:
+                    if first_source.startswith("http"):
+                        st.markdown(f'<div class="source-link">📎 Source: <a href="{first_source}" target="_blank">{first_source}</a></div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="source-link">📎 Source: {first_source}</div>', unsafe_allow_html=True)
+                
+                # Display suggestions if "I don't know"
+                if suggestions:
+                    st.markdown("\n\n**Try asking:**\n" + "\n".join([f"- {q}" for q in suggestions]))
+                
+                # Update History with source stored separately
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": response_text,
+                    "source": first_source
+                })
+                
+            except Exception as e:
+                error_msg = f"Sorry, I encountered an error: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
