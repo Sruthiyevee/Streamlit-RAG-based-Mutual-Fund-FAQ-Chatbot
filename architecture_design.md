@@ -34,7 +34,71 @@ This document outlines the complete architecture for a **Facts-Only Mutual Fund 
 
 ## 2. Architecture Diagrams
 
-### 2.1 High-Level System Architecture
+### 2.1 Phase Relationship Diagram
+
+This diagram shows how all 6 phases connect and flow from data collection to user interaction:
+
+```mermaid
+graph LR
+    subgraph "PHASE 0: Scoping"
+        P0[Excel File<br/>Resource Registry]
+    end
+    
+    subgraph "PHASE 1: Data Collection"
+        P1A[Scraper] --> P1B[Raw Data]
+        P1B --> P1C[Cleaner]
+        P1C --> P1D[30 Cleaned<br/>JSON Files]
+    end
+    
+    subgraph "PHASE 2: Vector Database"
+        P2A[Chunker<br/>500 chars] --> P2B[Embedder<br/>384 dims]
+        P2B --> P2C[Vector Store<br/>697 chunks]
+    end
+    
+    subgraph "PHASE 3: Retrieval"
+        P3A[Query<br/>Encoder] --> P3B[Similarity<br/>Search]
+        P3B --> P3C[Top 5<br/>Chunks]
+    end
+    
+    subgraph "PHASE 4: Generation"
+        P4A[Context<br/>Builder] --> P4B[Groq API<br/>1 call]
+        P4B --> P4C[Answer +<br/>Sources]
+    end
+    
+    subgraph "PHASE 5 & 6: Interfaces"
+        P5A[CLI]
+        P5B[Streamlit<br/>Web App]
+    end
+    
+    P0 -->|URLs| P1A
+    P1D -->|Input| P2A
+    P2C -->|Loaded at<br/>startup| P3B
+    P3C -->|Context| P4A
+    P4C -->|Display| P5A
+    P4C -->|Display| P5B
+    
+    style P0 fill:#e3f2fd
+    style P1D fill:#e8f5e9
+    style P2C fill:#fff3e0
+    style P3C fill:#f3e5f5
+    style P4C fill:#fce4ec
+    style P5A fill:#e0f2f1
+    style P5B fill:#e0f2f1
+```
+
+**Key Relationships**:
+- **Phase 0 → 1**: Source URLs feed into scraper
+- **Phase 1 → 2**: Cleaned text becomes vector embeddings
+- **Phase 2 → 3**: Vector DB enables similarity search
+- **Phase 3 → 4**: Retrieved chunks provide context for LLM
+- **Phase 4 → 5/6**: Generated answers displayed in interfaces
+
+**Data Flow**:
+- **Offline (Phases 0-2)**: One-time setup, creates knowledge base
+- **Runtime (Phases 3-4)**: Per-query processing, 1 API call
+- **Interface (Phases 5-6)**: User interaction layer
+
+### 2.2 High-Level System Architecture
 
 ```mermaid
 graph TB
